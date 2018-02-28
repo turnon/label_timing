@@ -3,30 +3,54 @@ require "label_timing/version"
 module LabelTiming
   def self.on form
     form.instance_variable_set :@field_times, []
+    form.instance_variable_set :@field_idx, -1
 
     class << form
       alias_method :o_label, :label
       attr_reader :field_times
 
       def label *args
-        field_times << [args[0], Time.current]
+        field_times << [(@field_idx += 1), args[0], Time.current]
         o_label *args
       end
 
       def stastics_result
         @stastics_result ||= (
-          field_times.each_with_index do |ft, i|
-            if (nex_ft = field_times[i+1])
-              ft << (nex_ft[1] - ft[1])
-            else
-              ft << 0
+          if field_times.size > 0
+            field_times.each_with_index do |ft, i|
+              if (nex_ft = field_times[i+1])
+                ft << (nex_ft[2] - ft[2])
+              else
+                ft << 0
+              end
             end
+            {
+              total: field_times[-1][2] - field_times[0][2],
+              labels: field_times.sort_by{ |e| e[3] }
+            }
+          else
+            {total: nil, labels: nil}
           end
-          {
-            total: field_times[-1][1] - field_times[0][1],
-            labels: field_times.sort_by{ |e| e[2] }
-          }
         )
+      end
+
+      def js_stastics_result id
+        "<script>
+           var #{id} = #{stastics_result.to_json};
+           #{id}.order = function(n){
+             if(n !== 1 && n !== 2){
+               return this.labels.sort(function(a, b){
+                 return a[n] - b[n];
+               });
+             }
+             return this.labels.sort(function(a, b){
+               if(!/^[a-zA-Z0-9]/.test(a[n]) && !/^[a-zA-Z0-9]/.test(b[n])){
+                 return a[n].localeCompare(b[n], 'zh');
+               }
+               return a[n] > b[n] ? 1 : -1;
+             });
+           };
+         </script>".gsub(/\n\s*/, '')
       end
     end
   end
@@ -41,9 +65,11 @@ module ActionView::Helpers::FormHelper
     form_fragment = o_form_for *args do |*form_builder|
       fb = form_builder[0]
       ::LabelTiming.on fb
+      fb.label :start_label_timing
       blk[*form_builder]
+      fb.label :end_label_timing
     end
     form_id = args[1].try(:[], :html).try(:[], :id) || "f_#{form_fragment.object_id}"
-    form_fragment + raw("<script>var #{form_id} = #{fb.stastics_result.to_json};</script>")
+    form_fragment + raw(fb.js_stastics_result(form_id))
   end
 end
