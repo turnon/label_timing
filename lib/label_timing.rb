@@ -11,7 +11,7 @@ module LabelTiming
       attr_reader :field_times
 
       def label *args
-        field_times << [(@field_idx += 1), args[0], Time.current]
+        field_times << [(@field_idx += 1), args[0], Time.now]
         o_label *args
       end
     end
