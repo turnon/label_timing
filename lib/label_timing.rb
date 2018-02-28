@@ -17,21 +17,25 @@ module LabelTiming
       def stastics_result
         @stastics_result ||= (
           if field_times.size > 0
-            field_times.each_with_index do |ft, i|
-              if (nex_ft = field_times[i+1])
-                ft << (nex_ft[2] - ft[2])
-              else
-                ft << 0
-              end
-            end
-            {
-              total: field_times[-1][2] - field_times[0][2],
-              labels: field_times.sort_by{ |e| e[3] }
-            }
+            enhance_time_log!
+            {total: @total, labels: field_times}
           else
             {total: nil, labels: nil}
           end
         )
+      end
+
+      def enhance_time_log!
+        @total = field_times[-1][2] - field_times[0][2]
+        field_times.each_with_index do |ft, i|
+          if (nex_ft = field_times[i+1])
+            dur = (nex_ft[2] - ft[2])
+            ft << dur
+            ft << (@total > 0 ? (dur / @total * 100).round(2) : 0)
+          else
+            ft << 0 << 0
+          end
+        end.sort_by!{ |e| e[3] }
       end
 
       def js_stastics_result id
@@ -70,7 +74,7 @@ module ActionView::Helpers::FormHelper
       blk[*form_builder]
       fb.label :end_label_timing
     end
-    form_id = args[1].try(:[], :html).try(:[], :id) || "f_#{form_fragment.object_id}"
+    form_id = "lbt_#{args[1].try(:[], :html).try(:[], :id) || form_fragment.object_id}"
     form_fragment + raw(fb.js_stastics_result(form_id))
   end
 end
