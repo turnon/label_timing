@@ -61,6 +61,7 @@ module ActionView::Helpers::FormHelper
   alias_method :o_form_for, :form_for
 
   def form_for *args, &blk
+    return o_form_for(*args, &blk) if params[:label_timing] == nil
     fb = nil
     form_fragment = o_form_for *args do |*form_builder|
       fb = form_builder[0]
